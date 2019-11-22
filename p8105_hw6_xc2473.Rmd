@@ -1,0 +1,39 @@
+---
+title: "p8105_hw6_xc2473"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Question 1**
+
+```{r}
+library(tidyverse)
+
+birthweight = read_csv("./data/birthweight.csv")
+
+sapply(birthweight, function(x) sum(is.na(x)))
+
+birthweight = birthweight %>% 
+  mutate(babysex = as.factor(babysex), 
+         frace = as.factor(frace), 
+         malform = as.factor(malform), 
+         mrace = as.factor(mrace)
+         )
+
+my_model = lm(bwt ~ bhead + blength + gaweeks + wtgain)
+  
+model_1 = lm(bwt ~ blength + gaweeks, data = birthweight)
+
+model_2 = lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex, data = birthweight)
+
+
+
+modelr::add_residuals(birthweight, model)
+
+modelr::add_predictions(birthweight, model)
+
+```
+
