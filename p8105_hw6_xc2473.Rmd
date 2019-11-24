@@ -11,6 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(tidyverse)
+library(modelr)
 
 birthweight = read_csv("./data/birthweight.csv")
 
@@ -23,7 +24,7 @@ birthweight = birthweight %>%
          mrace = as.factor(mrace)
          )
 
-my_model = lm(bwt ~ bhead + blength + gaweeks + wtgain)
+my_model = lm(bwt ~ bhead + blength + gaweeks + wtgain, data = birthweight)
   
 model_1 = lm(bwt ~ blength + gaweeks, data = birthweight)
 
@@ -36,4 +37,86 @@ modelr::add_residuals(birthweight, model)
 modelr::add_predictions(birthweight, model)
 
 ```
+
+```{r}
+birthweight =
+  crossv_mc(birthweight, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble))
+
+library(mgcv)
+
+smooth_mod = mgcv::gam(y ~ s(x), data = train_df)
+
+birthweight = 
+  birthweight %>% 
+  mutate(my_model  = map(train, ~lm(bwt ~ bhead + blength + gaweeks + wtgain, data = .x)),
+         model_1  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+         model_2  = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex, data = .x)),
+         model_smooth = map(train, ~mgcv::gam(bwt ~ s(bhead + blength + gaweeks + wtgain), data = .x))) %>% 
+  mutate(rmse_my_model = map2_dbl(my_model, test, ~rmse(model = .x, data = .y)),
+         rmse_model_1 = map2_dbl(model_1, test, ~rmse(model = .x, data = .y)),
+         rmse_model_2 = map2_dbl(model_2, test, ~rmse(model = .x, data = .y)),
+         rmse_model_smooth = map2_dbl(model_smooth, test, ~rmse(model = .x, data = .y)))
+
+birthweight %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model", 
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) + geom_violin()
+```
+
+**Question 2**
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+
+boot_sample = function(df) {
+  sample_frac(df, replace = TRUE)
+}
+
+boot_straps = 
+  data_frame(
+    strap_number = 1:50,
+    strap_sample = rerun(50, boot_sample(weather_df))
+  )
+
+bootstrap_results = 
+  boot_straps %>% 
+  mutate(
+    models = map(strap_sample, ~lm(tmax ~ tmin, data = .x)),
+    tidy = map(models, broom::tidy),
+    glance = map(models, broom::glance)) %>% 
+  select(-strap_sample, -models) %>% 
+  unnest("tidy", keep_empty = TRUE) %>% 
+  select(strap_number, term, estimate, glance) %>% 
+  pivot_wider(
+    names_from = "term",
+    values_from = "estimate"
+  ) %>% 
+  unnest("glance") %>% 
+  janitor::clean_names() %>% 
+  select(strap_number, r_squared, intercept, tmin) %>% 
+  mutate(log_beta = log(intercept * tmin)) 
+
+
+  group_by(term) %>% 
+  summarize(boot_se = sd(estimate))
+```
+
 
