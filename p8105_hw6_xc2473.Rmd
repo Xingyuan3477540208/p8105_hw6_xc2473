@@ -43,7 +43,7 @@ ggplot(aes(x = pred, y = resid)) +
   )
 ```
 
-Since I think baby’s head circumference at birth, baby’s length at birth, gestational age in weeks, and mother’s weight gain during pregnancy are important factors for baby’s birth weight. Therefore, my model statement is "bwt = bhead * beta1 +  blength * beta2 + gaweeks * beta3 + wtgain * beta4".
+Since I think baby’s head circumference at birth, baby’s length at birth, gestational age in weeks, and mother’s weight gain during pregnancy are important factors for baby’s birth weight hypothetically. Therefore, my model statement is "bwt = bhead * beta1 +  blength * beta2 + gaweeks * beta3 + wtgain * beta4".
 
 As we can see from the plot of residuals against fittted values, the spread is not constant.
 
@@ -75,7 +75,7 @@ birthweight %>%
   ggplot(aes(x = model, y = rmse)) + geom_violin()
 ```
 
-From the plot we can see that, my model has less prediction error than other two models. However, the values of high root mean squared errors suggest that none of the three models work very well.
+From the plot we can see that, my model has much less prediction error than the model involving length at birth and gestational age as predictors and has slightly lower prediction error than the interaction model (model 2), Therefore, my model may be the most reasonable model among the three models. However, the high values of root mean squared errors suggest that none of the three models work very well.
 
 **Question 2**
 
@@ -127,7 +127,7 @@ bootstrap_results %>%
        x = "estimate")
 ```
 
-We can see that the distribution of r squared is a little right-skewed, but it is very close to a normal distribution. The 95% confidence interval for r squared is `r quantile(pull(bootstrap_results, r_squared), probs = c(0.025, 0.975))`.
+We can see that the distribution of r squared is a little right-skewed, but it is very close to a normal distribution. The 95% confidence interval for r squared is (`r quantile(pull(bootstrap_results, r_squared), probs = c(0.025, 0.975))`.)
 
 
 ```{r}
@@ -137,6 +137,7 @@ bootstrap_results %>%
   labs(title = "Distribution of log beta0 * beta1",
        x = "estimate")
 ```
-We can see that the distribution of log(beta0 * beta1") is close to a normal distribution. The 95% confidence interval for estimates of log(beta0 * beta1") is `r quantile(pull(bootstrap_results, log_beta), probs = c(0.025, 0.975))`
+
+We can see that the distribution of log(beta0 * beta1") is close to a normal distribution. The 95% confidence interval for estimates of log(beta0 * beta1") is (`r quantile(pull(bootstrap_results, log_beta), probs = c(0.025, 0.975))`).
 
 
