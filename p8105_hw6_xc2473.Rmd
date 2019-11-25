@@ -1,6 +1,6 @@
 ---
 title: "p8105_hw6_xc2473"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(tidyverse)
 library(modelr)
+library(mgcv)
 
 birthweight = read_csv("./data/birthweight.csv")
 
@@ -25,18 +26,26 @@ birthweight = birthweight %>%
          )
 
 my_model = lm(bwt ~ bhead + blength + gaweeks + wtgain, data = birthweight)
-  
-model_1 = lm(bwt ~ blength + gaweeks, data = birthweight)
 
-model_2 = lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex, data = birthweight)
+bw_resi_predib = 
+  merge(
+  modelr::add_residuals(birthweight, my_model),
+  modelr::add_predictions(birthweight, my_model),
+  by = "row.names", all = TRUE)
 
-
-
-modelr::add_residuals(birthweight, model)
-
-modelr::add_predictions(birthweight, model)
-
+bw_resi_predib %>% 
+ggplot(aes(x = pred, y = resid)) + 
+  geom_point(alpha = 0.5, color = "blue") +
+  labs(
+    title = "Model residuals against fitted values",
+    x = "Fitted values",
+    y = "Residuals"
+  )
 ```
+
+Since I think baby’s head circumference at birth, baby’s length at birth, gestational age in weeks, and mother’s weight gain during pregnancy are important factors for baby’s birth weight. Therefore, my model statement is "bwt = bhead * beta1 +  blength * beta2 + gaweeks * beta3 + wtgain * beta4".
+
+As we can see from the plot of residuals against fittted values, the spread is not constant.
 
 ```{r}
 birthweight =
@@ -45,20 +54,15 @@ birthweight =
     train = map(train, as_tibble),
     test = map(test, as_tibble))
 
-library(mgcv)
-
-smooth_mod = mgcv::gam(y ~ s(x), data = train_df)
-
 birthweight = 
   birthweight %>% 
   mutate(my_model  = map(train, ~lm(bwt ~ bhead + blength + gaweeks + wtgain, data = .x)),
          model_1  = map(train, ~lm(bwt ~ blength + gaweeks, data = .x)),
-         model_2  = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex, data = .x)),
-         model_smooth = map(train, ~mgcv::gam(bwt ~ s(bhead + blength + gaweeks + wtgain), data = .x))) %>% 
+         model_2  = map(train, ~lm(bwt ~ bhead + blength + babysex + bhead * blength + bhead * babysex + blength * babysex, data = .x))
+          ) %>% 
   mutate(rmse_my_model = map2_dbl(my_model, test, ~rmse(model = .x, data = .y)),
          rmse_model_1 = map2_dbl(model_1, test, ~rmse(model = .x, data = .y)),
-         rmse_model_2 = map2_dbl(model_2, test, ~rmse(model = .x, data = .y)),
-         rmse_model_smooth = map2_dbl(model_smooth, test, ~rmse(model = .x, data = .y)))
+         rmse_model_2 = map2_dbl(model_2, test, ~rmse(model = .x, data = .y)))
 
 birthweight %>% 
   select(starts_with("rmse")) %>% 
@@ -70,6 +74,8 @@ birthweight %>%
   mutate(model = fct_inorder(model)) %>% 
   ggplot(aes(x = model, y = rmse)) + geom_violin()
 ```
+
+From the plot we can see that, my model has less prediction error than other two models. However, the values of high root mean squared errors suggest that none of the three models work very well.
 
 **Question 2**
 
@@ -91,9 +97,9 @@ boot_sample = function(df) {
 }
 
 boot_straps = 
-  data_frame(
-    strap_number = 1:50,
-    strap_sample = rerun(50, boot_sample(weather_df))
+  tibble(
+    strap_number = 1:5000,
+    strap_sample = rerun(5000, boot_sample(weather_df))
   )
 
 bootstrap_results = 
@@ -114,9 +120,23 @@ bootstrap_results =
   select(strap_number, r_squared, intercept, tmin) %>% 
   mutate(log_beta = log(intercept * tmin)) 
 
-
-  group_by(term) %>% 
-  summarize(boot_se = sd(estimate))
+bootstrap_results %>% 
+  ggplot(aes(x = r_squared, fill = "density")) + 
+  geom_density(alpha = .4, adjust = .5, color = "blue") +
+  labs(title = "Distribution of r squared",
+       x = "estimate")
 ```
+
+We can see that the distribution of r squared is a little right-skewed, but it is very close to a normal distribution. The 95% confidence interval for r squared is `r quantile(pull(bootstrap_results, r_squared), probs = c(0.025, 0.975))`.
+
+
+```{r}
+bootstrap_results %>% 
+  ggplot(aes(x = log_beta, fill = "density")) + 
+  geom_density(alpha = .4, adjust = .5, color = "blue") +
+  labs(title = "Distribution of log beta0 * beta1",
+       x = "estimate")
+```
+We can see that the distribution of log(beta0 * beta1") is close to a normal distribution. The 95% confidence interval for estimates of log(beta0 * beta1") is `r quantile(pull(bootstrap_results, log_beta), probs = c(0.025, 0.975))`
 
 
